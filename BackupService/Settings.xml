@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Settings>
+	<BackupTime>2</BackupTime>
+	<TargetShare>\\10.10.1.3\backup</TargetShare>
+	<Username>backupoperator</Username>
+	<Password>@dminWLSS</Password>
+</Settings>
