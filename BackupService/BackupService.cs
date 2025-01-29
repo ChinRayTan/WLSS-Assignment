@@ -1,13 +1,10 @@
 ﻿using Microsoft.Win32;
 using System;
-using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
 using System.Reflection;
 using System.ServiceProcess;
-using System.Windows;
-using System.Windows.Documents;
 using System.Xml.Linq;
 using static BackupService.PInvokes;
 
@@ -99,7 +96,6 @@ namespace BackupService
                     sw.WriteLine(header);
                     sw.WriteLine(new String('-', header.Length));
                     sw.WriteLine();
-                    sw.WriteLine();
                     sw.WriteLine("Apps in HKLM:");
                     sw.WriteLine();
 
@@ -109,14 +105,27 @@ namespace BackupService
                         WriteDataToFile(sw, hklmApps, registryKey);
                     }
 
+                    sw.WriteLine("Apps in HKLM (32-bit):");
+                    sw.WriteLine();
+                    eventLog1.WriteEntry("Now processing: Apps in HKLM (32-bit).");
+                    RegistryKey hklmApps32bit = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall");
+                    foreach (string registryKey in hklmApps32bit.GetSubKeyNames())
+                    {
+                        WriteDataToFile(sw, hklmApps32bit, registryKey);
+                    }
+
+                    eventLog1.WriteEntry("Now processing: Users");
                     RegistryKey users = Registry.Users;
                     foreach (string user in users.GetSubKeyNames())
                     {
-                        if (users.OpenSubKey(user).OpenSubKey(@"SOFTWARE\Microsoft\Windows\Uninstall") == null) continue;
+                        RegistryKey? userApps = users.OpenSubKey(user).OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                        if (userApps == null || userApps.GetSubKeyNames().Length == 0) continue;
                         else
                         {
-                            eventLog1.WriteEntry($"Now processing: Apps in user {Registry.LocalMachine.OpenSubKey($@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{user}").GetValue("ProfileImagePath").ToString().Split('\\')[2]}");
-                            RegistryKey userApps = users.OpenSubKey(user).OpenSubKey(@"SOFTWARE\Microsoft\Windows\Uninstall");
+                            string? username = Registry.LocalMachine.OpenSubKey($@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{user}").GetValue("ProfileImagePath").ToString().Split('\\')[2];
+                            eventLog1.WriteEntry($"Now processing: Apps in user {username}");
+                            sw.WriteLine($"Apps in user {username}:");
+                            sw.WriteLine();
                             foreach (string registryKey in userApps.GetSubKeyNames())
                             {
                                 WriteDataToFile(sw, userApps, registryKey);
@@ -128,7 +137,8 @@ namespace BackupService
                 }
 
                 eventLog1.WriteEntry("Backup finished. See you tomorrow, same time.");
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 OnException(ex);
             }
@@ -139,30 +149,40 @@ namespace BackupService
             RegistryKey? subKey = parentRegistryKey.OpenSubKey(childRegistryKey);
             if (subKey.GetValue("DisplayName") == null) return;
 
-            eventLog1.WriteEntry(subKey.GetValue("InstallDate").ToString().Insert(4, "/").Insert(7, "/"));
-
             sw.WriteLine($"Name: {subKey.GetValue("DisplayName")}");
             sw.WriteLine($"Publisher: {subKey.GetValue("Publisher")}");
             sw.WriteLine($"Version: {subKey.GetValue("DisplayVersion")}");
-            sw.WriteLine($"Install date: {Convert.ToDateTime(subKey.GetValue("InstallDate").ToString().Insert(4, "/").Insert(7, "/")).ToString("d")}");
 
-            if (string.IsNullOrEmpty(subKey.GetValue("InstallLocation").ToString()))
+            string installDate = subKey.GetValue("InstallDate")?.ToString().Insert(4, "/").Insert(7, "/") ?? "";
+            if (string.IsNullOrEmpty(installDate))
+                sw.WriteLine($"Install date: Unknown");
+            else
+                sw.WriteLine($"Install date: {Convert.ToDateTime(installDate).ToString("d")}");
+
+            try
             {
-                ManagementObjectSearcher mos = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Product");
-                foreach (ManagementObject mo in mos.Get())
+                if (string.IsNullOrEmpty(subKey.GetValue("InstallLocation").ToString()))
                 {
-                    if (mo["Name"].ToString().Contains(subKey.GetValue("DisplayName").ToString()))
+                    ManagementObjectSearcher mos = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Product");
+                    foreach (ManagementObject mo in mos.Get())
                     {
-                        sw.WriteLine($"Install location: {mo["InstallLocation"]}");
-                        break;
+                        if (mo["Name"].ToString().Contains(subKey.GetValue("DisplayName").ToString()))
+                        {
+                            sw.WriteLine($"Install location: {mo["InstallLocation"] ?? "Unknown"}");
+                            break;
+                        }
                     }
                 }
+                else
+                {
+                    sw.WriteLine($"Install location: {subKey.GetValue("InstallLocation") ?? "Unknown"}");
+                }
             }
-            else
+            catch
             {
-                sw.WriteLine($"Install location: {subKey.GetValue("InstallLocation")}");
+                sw.WriteLine($"Install location: Unknown");
             }
-            
+
             sw.WriteLine();
         }
 
