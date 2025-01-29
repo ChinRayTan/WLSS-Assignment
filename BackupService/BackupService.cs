@@ -80,7 +80,7 @@ namespace BackupService
 
                 Process mountNetworkDrive = new Process();
                 mountNetworkDrive.StartInfo.FileName = "net.exe";
-                mountNetworkDrive.StartInfo.Arguments = $@"use Z: \\{Settings.TargetShare} /user:{Settings.Username} {Settings.Password}";
+                mountNetworkDrive.StartInfo.Arguments = $@"use Z: {Settings.TargetShare} /user:{Settings.Username} {Settings.Password}";
                 mountNetworkDrive.StartInfo.UseShellExecute = false;
                 mountNetworkDrive.StartInfo.RedirectStandardOutput = true;
                 mountNetworkDrive.StartInfo.CreateNoWindow = true;
