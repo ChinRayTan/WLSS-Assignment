@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
@@ -94,7 +95,7 @@ namespace BackupService
                 RegistryKey hklmApps = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
                 using (StreamWriter sw = new StreamWriter($@"Z:\AppsList_{DateTime.Today.ToString("yyyy-MM-dd")}.txt", false))
                 {
-                    string header = $"List of apps on {Environment.MachineName} as of {DateTime.Today.ToString("g")}";
+                    string header = $"List of apps on {Environment.MachineName} as of {DateTime.Now.ToString("g")}";
                     sw.WriteLine(header);
                     sw.WriteLine(new String('-', header.Length));
                     sw.WriteLine();
@@ -138,10 +139,12 @@ namespace BackupService
             RegistryKey? subKey = parentRegistryKey.OpenSubKey(childRegistryKey);
             if (subKey.GetValue("DisplayName") == null) return;
 
+            eventLog1.WriteEntry(subKey.GetValue("InstallDate").ToString().Insert(4, "/").Insert(7, "/"));
+
             sw.WriteLine($"Name: {subKey.GetValue("DisplayName")}");
             sw.WriteLine($"Publisher: {subKey.GetValue("Publisher")}");
             sw.WriteLine($"Version: {subKey.GetValue("DisplayVersion")}");
-            sw.WriteLine($"Install date: {Convert.ToDateTime(subKey.GetValue("InstallDate")).ToString("d")}");
+            sw.WriteLine($"Install date: {Convert.ToDateTime(subKey.GetValue("InstallDate").ToString().Insert(4, "/").Insert(7, "/")).ToString("d")}");
 
             if (string.IsNullOrEmpty(subKey.GetValue("InstallLocation").ToString()))
             {
@@ -159,6 +162,8 @@ namespace BackupService
             {
                 sw.WriteLine($"Install location: {subKey.GetValue("InstallLocation")}");
             }
+            
+            sw.WriteLine();
         }
 
         private void OnException(Exception ex)
