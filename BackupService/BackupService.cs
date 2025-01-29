@@ -6,6 +6,7 @@ using System.Management;
 using System.Reflection;
 using System.ServiceProcess;
 using System.Windows;
+using System.Windows.Documents;
 using System.Xml.Linq;
 using static BackupService.PInvokes;
 
@@ -90,8 +91,8 @@ namespace BackupService
 
                 eventLog1.WriteEntry("Now processing: Creating text file on backup share.");
 
-                RegistryKey hklmApps = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", true);
-                using (StreamWriter sw = new StreamWriter($@"Z:\AppsList_{DateTime.Today.ToString("yyyy-MM-dd")}"))
+                RegistryKey hklmApps = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                using (StreamWriter sw = new StreamWriter($@"Z:\AppsList_{DateTime.Today.ToString("yyyy-MM-dd")}.txt", false))
                 {
                     string header = $"List of apps on {Environment.MachineName} as of {DateTime.Today.ToString("g")}";
                     sw.WriteLine(header);
@@ -134,7 +135,9 @@ namespace BackupService
 
         private void WriteDataToFile(StreamWriter sw, RegistryKey parentRegistryKey, string childRegistryKey)
         {
-            RegistryKey subKey = parentRegistryKey.OpenSubKey(childRegistryKey);
+            RegistryKey? subKey = parentRegistryKey.OpenSubKey(childRegistryKey);
+            if (subKey.GetValue("DisplayName") == null) return;
+
             sw.WriteLine($"Name: {subKey.GetValue("DisplayName")}");
             sw.WriteLine($"Publisher: {subKey.GetValue("Publisher")}");
             sw.WriteLine($"Version: {subKey.GetValue("DisplayVersion")}");
@@ -160,7 +163,7 @@ namespace BackupService
 
         private void OnException(Exception ex)
         {
-            eventLog1.WriteEntry(ex.Message, EventLogEntryType.Error);
+            eventLog1.WriteEntry(ex.Message + "\n" + ex.StackTrace, EventLogEntryType.Error);
         }
     }
 }
