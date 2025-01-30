@@ -27,9 +27,9 @@ namespace BackupService
         {
             InitializeComponent();
             eventLog1 = new EventLog();
-            if (!EventLog.SourceExists("WLSS Backup")) EventLog.CreateEventSource("WLSS Backup", "Logs");
-            eventLog1.Source = "WLSS Backup";
-            eventLog1.Log = "Logs";
+            if (!EventLog.SourceExists("WLSS Backup")) EventLog.CreateEventSource("WLSS Backup Service", "WLSSBackup");
+            eventLog1.Source = "WLSS Backup Service";
+            eventLog1.Log = "WLSSBackup";
         }
 
         protected override void OnStart(string[] args)
@@ -66,14 +66,13 @@ namespace BackupService
         private void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             ExecuteBackup();
+            timer.Interval = 24 * 60 * 60 * 1000;
         }
 
         private void ExecuteBackup()
         {
             try
             {
-                timer.Interval = 24 * 60 * 60 * 1000;
-
                 eventLog1.WriteEntry("Time to backup - Beginning backup now.");
                 eventLog1.WriteEntry("Now processing: Connecting to backup share.");
 
@@ -89,7 +88,7 @@ namespace BackupService
 
                 eventLog1.WriteEntry("Now processing: Creating text file on backup share.");
 
-                RegistryKey hklmApps = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                RegistryKey hklmApps = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
                 using (StreamWriter sw = new StreamWriter($@"Z:\AppsList_{DateTime.Today.ToString("yyyy-MM-dd")}.txt", false))
                 {
                     string header = $"List of apps on {Environment.MachineName} as of {DateTime.Now.ToString("g")}";
@@ -108,7 +107,7 @@ namespace BackupService
                     sw.WriteLine("Apps in HKLM (32-bit):");
                     sw.WriteLine();
                     eventLog1.WriteEntry("Now processing: Apps in HKLM (32-bit).");
-                    RegistryKey hklmApps32bit = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall");
+                    RegistryKey hklmApps32bit = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall");
                     foreach (string registryKey in hklmApps32bit.GetSubKeyNames())
                     {
                         WriteDataToFile(sw, hklmApps32bit, registryKey);
@@ -136,7 +135,17 @@ namespace BackupService
 
                 }
 
-                eventLog1.WriteEntry("Backup finished. See you tomorrow, same time.");
+                Process unmountNetworkDrive = new Process();
+                unmountNetworkDrive.StartInfo.FileName = "net.exe";
+                unmountNetworkDrive.StartInfo.Arguments = $@"use Z: /delete";
+                unmountNetworkDrive.StartInfo.UseShellExecute = false;
+                unmountNetworkDrive.StartInfo.RedirectStandardOutput = true;
+                unmountNetworkDrive.StartInfo.CreateNoWindow = true;
+                unmountNetworkDrive.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+                unmountNetworkDrive.Start();
+                unmountNetworkDrive.WaitForExit();
+
+                eventLog1.WriteEntry($"Backup finished. See you tomorrow, same time. ({DateTime.Now.AddMilliseconds(timer.Interval).ToString("g")})");
             }
             catch (Exception ex)
             {
@@ -156,8 +165,11 @@ namespace BackupService
             string installDate = subKey.GetValue("InstallDate")?.ToString().Insert(4, "/").Insert(7, "/") ?? "";
             if (string.IsNullOrEmpty(installDate))
                 sw.WriteLine($"Install date: Unknown");
+            else if (DateTime.TryParseExact(installDate, "yyyy/MM/dd", null, System.Globalization.DateTimeStyles.None, out DateTime formattedInstallDate))
+                sw.WriteLine($"Install date: {DateTime.ParseExact(installDate, "yyyy/MM/dd", null).ToString("d")}");
             else
-                sw.WriteLine($"Install date: {Convert.ToDateTime(installDate).ToString("d")}");
+                sw.WriteLine("Install date: Invalid date returned");
+
 
             try
             {
