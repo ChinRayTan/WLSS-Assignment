@@ -33,6 +33,7 @@
             // 
             // serviceProcessInstaller1
             // 
+            this.serviceProcessInstaller1.Account = System.ServiceProcess.ServiceAccount.LocalService;
             this.serviceProcessInstaller1.Password = null;
             this.serviceProcessInstaller1.Username = null;
             // 
@@ -41,6 +42,7 @@
             this.BackupService.Description = "Custom service to backup all files and apps on the Windows Server.";
             this.BackupService.DisplayName = "WLSS Backup Service";
             this.BackupService.ServiceName = "BackupService";
+            this.BackupService.StartType = System.ServiceProcess.ServiceStartMode.Automatic;
             // 
             // ProjectInstaller
             // 
