@@ -65,8 +65,8 @@ namespace BackupService
 
         private void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            ExecuteBackup();
             timer.Interval = 24 * 60 * 60 * 1000;
+            ExecuteBackup();
         }
 
         private void ExecuteBackup()
